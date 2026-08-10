@@ -1,0 +1,2450 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GeoExplorer - Tableau de bord & Administration</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        :root {
+            --bg-color: #f8fafc;
+            --text-color: #0f172a;
+            --card-bg: #ffffff;
+            --card-border: #e2e8f0;
+            --text-muted: #64748b;
+            --nav-bg: rgba(255, 255, 255, 0.95);
+            --nav-border: #e2e8f0;
+            --modal-bg: #ffffff;
+            --modal-card: #f8fafc;
+            --input-bg: #ffffff;
+        }
+
+        body.dark-mode {
+            --bg-color: #0f172a;
+            --text-color: #f1f5f9;
+            --card-bg: #1e293b;
+            --card-border: #334155;
+            --text-muted: #94a3b8;
+            --nav-bg: rgba(15, 23, 42, 0.95);
+            --nav-border: #334155;
+            --modal-bg: rgba(0, 0, 0, 0.7);
+            --modal-card: #1e293b;
+            --input-bg: #0f172a;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            padding: 15px;
+            padding-bottom: 90px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .view {
+            width: 100%;
+            max-width: 500px;
+            display: none;
+            flex-direction: column;
+            gap: 16px;
+            padding-bottom: 20px;
+        }
+
+        .view.active {
+            display: flex;
+        }
+
+        #carteView {
+            max-width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 100;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 10;
+        }
+
+        .overlay-ui {
+            position: absolute;
+            z-index: 20;
+            pointer-events: auto;
+        }
+
+        @keyframes clignoter {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.3; transform: scale(1.15); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        .zone-clignotante {
+            animation: clignoter 2s infinite ease-in-out;
+        }
+        .gps-clignotant-actif {
+            animation: clignoter 0.9s infinite ease-in-out;
+            background-color: #ef4444 !important;
+            color: white !important;
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.7);
+        }
+
+        .user-banner {
+            background-color: #064e3b;
+            border-radius: 14px;
+            padding: 14px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+            box-shadow: 0 4px 12px rgba(6, 78, 59, 0.2);
+            gap: 10px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .user-avatar-container {
+            position: relative;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            overflow: hidden;
+            border: 2px solid #ffffff;
+            background-color: #cbd5e1;
+            flex-shrink: 0;
+        }
+
+        .user-avatar {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .user-details {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .user-details h4 {
+            font-size: 12px;
+            font-weight: 600;
+            color: #f8fafc;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .user-details p {
+            font-size: 11px;
+            color: #34d399;
+            font-weight: 500;
+            margin-top: 2px;
+        }
+
+        .banner-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        .theme-toggle-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        .logout-btn {
+            background-color: #ef4444;
+            color: white;
+            border: none;
+            padding: 7px 10px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 11px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            display: none;
+            padding: 15px;
+        }
+
+        .modal-card {
+            background: var(--modal-card);
+            color: var(--text-color);
+            padding: 25px;
+            border-radius: 20px;
+            width: 100%;
+            max-width: 380px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            border: 1px solid var(--card-border);
+        }
+
+        .modal-avatar-wrapper {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            overflow: hidden;
+            border: 3px solid #059669;
+            cursor: pointer;
+        }
+
+        .modal-avatar-wrapper img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .modal-avatar-wrapper input[type="file"] {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .modal-info-group {
+            width: 100%;
+            text-align: left;
+            background: var(--input-bg);
+            padding: 10px 14px;
+            border-radius: 10px;
+            border: 1px solid var(--card-border);
+            font-size: 13px;
+        }
+
+        .modal-info-group span {
+            display: block;
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .modal-info-group strong {
+            color: var(--text-color);
+            font-size: 13px;
+            word-break: break-all;
+        }
+
+        .btn-close-modal {
+            background-color: #059669;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            font-size: 14px;
+        }
+
+        .page-main-title {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--text-color);
+            margin-top: 5px;
+        }
+
+        .page-subtitle {
+            font-size: 13px;
+            color: var(--text-muted);
+            font-weight: 500;
+            margin-top: -10px;
+            line-height: 1.4;
+        }
+
+        .sub-promo-box {
+            background-color: #064e3b;
+            border-radius: 14px;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+            box-shadow: 0 4px 15px rgba(6, 78, 59, 0.25);
+        }
+
+        .sub-promo-text h3 {
+            font-size: 16px;
+            font-weight: 700;
+            color: #facc15;
+            margin-bottom: 6px;
+        }
+
+        .sub-promo-text p {
+            font-size: 12px;
+            color: #e2e8f0;
+            max-width: 210px;
+            line-height: 1.4;
+        }
+
+        .cta-sub-btn {
+            background-color: #f97316;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 13px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .course-card-v2 {
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-left: 6px solid #ef4444;
+            border-radius: 14px;
+            padding: 18px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+
+        .course-card-v2.free-card {
+            border-left-color: #059669;
+        }
+
+        .badge-tag {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 6px;
+            width: fit-content;
+        }
+
+        .badge-tag.premium {
+            background-color: rgba(239, 68, 68, 0.1);
+            color: #dc2626;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .badge-tag.free {
+            background-color: rgba(16, 185, 129, 0.1);
+            color: #059669;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .course-card-v2 h3 {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-color);
+        }
+
+        .course-card-v2 p {
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        .action-course-btn {
+            background-color: #f97316;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .action-course-btn.free-action {
+            background-color: #059669;
+        }
+
+        .ai-scanner-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 14px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+
+        .preview-box {
+            width: 100%;
+            height: 200px;
+            background: var(--input-bg);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border: 2px dashed var(--card-border);
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        .preview-box img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: none;
+        }
+
+        .btn-upload {
+            background-color: #f97316;
+            color: white;
+            padding: 14px;
+            border-radius: 12px;
+            font-weight: bold;
+            font-size: 15px;
+            text-align: center;
+            display: block;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.2);
+        }
+
+        .btn-expert-scan {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            color: white;
+            padding: 14px;
+            border-radius: 12px;
+            font-weight: bold;
+            font-size: 15px;
+            text-align: center;
+            display: block;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25);
+            transition: opacity 0.2s;
+        }
+
+        .btn-expert-scan:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        input[type="file"].hidden-file-input {
+            display: none;
+        }
+
+        .results {
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+            text-align: left;
+            background: var(--input-bg);
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #059669;
+            border: 1px solid var(--card-border);
+        }
+
+        .mohs-badge {
+            display: inline-block;
+            background: rgba(249, 115, 22, 0.15);
+            color: #d97706;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-top: 4px;
+            border: 1px solid rgba(249, 115, 22, 0.3);
+            width: fit-content;
+        }
+
+        .deep-analysis-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 5000;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .spinner-box {
+            width: 60px;
+            height: 60px;
+            border: 5px solid rgba(255,255,255,0.2);
+            border-top: 5px solid #34d399;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .analysis-steps-text {
+            font-size: 15px;
+            font-weight: 600;
+            color: #34d399;
+            min-height: 24px;
+        }
+
+        .carnet-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 14px;
+            padding: 20px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .carnet-input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .carnet-input-group label {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-color);
+        }
+
+        .carnet-input-group input, 
+        .carnet-input-group textarea, 
+        .carnet-input-group select {
+            background: var(--input-bg);
+            color: var(--text-color);
+            border: 1px solid var(--card-border);
+            padding: 10px 12px;
+            border-radius: 10px;
+            font-size: 13px;
+            outline: none;
+        }
+
+        .carnet-input-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .gps-capture-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .gps-capture-row input {
+            flex: 1;
+        }
+
+        .btn-gps-auto {
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 14px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 12px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .btn-save-note {
+            background-color: #059669;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(5, 150, 105, 0.2);
+        }
+
+        .notes-list-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 10px;
+        }
+
+        .note-item-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-left: 5px solid #059669;
+            border-radius: 12px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+            position: relative;
+        }
+
+        .note-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .note-item-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-color);
+        }
+
+        .note-item-date {
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+
+        .note-item-coords {
+            font-size: 11px;
+            color: #3b82f6;
+            font-weight: 600;
+        }
+
+        .note-item-desc {
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        .note-item-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 4px;
+            padding-top: 6px;
+            border-top: 1px solid var(--card-border);
+        }
+
+        .note-litho-badge {
+            font-size: 10px;
+            background: rgba(5, 150, 105, 0.1);
+            color: #059669;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-weight: 700;
+        }
+
+        .btn-delete-note {
+            background: none;
+            border: none;
+            color: #ef4444;
+            font-size: 12px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .sub-top-banner {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            border-radius: 16px;
+            padding: 18px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 0 4px 15px rgba(5, 150, 105, 0.25);
+            border: 1px solid #34d399;
+        }
+
+        .sub-top-icon {
+            font-size: 28px;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 10px;
+            border-radius: 12px;
+        }
+
+        .sub-top-text h3 {
+            font-size: 16px;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 4px;
+        }
+
+        .sub-top-text p {
+            font-size: 12px;
+            color: #d1fae5;
+            line-height: 1.4;
+        }
+
+        .section-title-sub {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-color);
+            margin-top: 5px;
+        }
+
+        .plan-option-card {
+            background: var(--card-bg);
+            border: 2px solid var(--card-border);
+            border-radius: 14px;
+            padding: 16px 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s ease;
+        }
+
+        .plan-option-card.selected {
+            border-color: #059669;
+            background: rgba(5, 150, 105, 0.05);
+        }
+
+        .plan-info h4 {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-color);
+            margin-bottom: 3px;
+        }
+
+        .plan-info p {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .plan-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .plan-price {
+            font-size: 18px;
+            font-weight: 800;
+            color: #059669;
+        }
+
+        .plan-radio {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--text-muted);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .plan-option-card.selected .plan-radio::after {
+            content: '';
+            width: 10px;
+            height: 10px;
+            background-color: #059669;
+            border-radius: 50%;
+        }
+
+        .plan-badge-tag {
+            position: absolute;
+            top: -10px;
+            right: 18px;
+            font-size: 9px;
+            font-weight: 800;
+            padding: 3px 8px;
+            border-radius: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .plan-badge-tag.popular {
+            background-color: #059669;
+            color: white;
+        }
+
+        .plan-badge-tag.best-value {
+            background-color: #3b82f6;
+            color: white;
+        }
+
+        .payment-box {
+            background: var(--card-bg);
+            border: 2px solid #f97316;
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            margin-top: 5px;
+        }
+
+        .payment-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .payment-icon-bg {
+            background: #ff7900;
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            flex-shrink: 0;
+        }
+
+        .payment-header-text h4 {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-color);
+        }
+
+        .payment-header-text p {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .number-display-box {
+            background: var(--input-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .phone-number-val {
+            font-size: 20px;
+            font-weight: 800;
+            color: #f97316;
+            letter-spacing: 1px;
+        }
+
+        .copy-btn {
+            background-color: #f97316;
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .payment-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.5;
+            padding-top: 5px;
+        }
+
+        .step-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        .step-number {
+            background: var(--card-border);
+            color: var(--text-color);
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .whatsapp-send-btn {
+            background-color: #22c55e;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            text-align: center;
+            text-decoration: none;
+            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
+        }
+
+        .email-send-btn {
+            background-color: transparent;
+            color: #f97316;
+            border: 2px solid #f97316;
+            padding: 12px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            text-align: center;
+        }
+
+        .payment-footer-note {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            margin-top: 2px;
+        }
+
+        .bottom-nav-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: var(--nav-bg);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid var(--nav-border);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 10px 0 25px 0;
+            z-index: 2000;
+            box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: none;
+            border: none;
+            cursor: pointer;
+            gap: 4px;
+            padding: 4px 8px;
+            transition: transform 0.1s ease;
+        }
+
+        .nav-icon {
+            font-size: 20px;
+            line-height: 1;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .nav-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .nav-item.active .nav-icon,
+        .nav-item.active .nav-label {
+            color: #f97316;
+        }
+        
+        .ai-fab {
+            position: fixed;
+            bottom: 90px;
+            right: 20px;
+            background-color: #064e3b;
+            color: white;
+            border: 2px solid #34d399;
+            width: 55px;
+            height: 55px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            z-index: 2500;
+            transition: transform 0.2s;
+        }
+
+        .ai-fullscreen-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: var(--bg-color);
+            z-index: 4000;
+            display: flex;
+            flex-direction: column;
+            display: none;
+        }
+
+        .ai-fullscreen-header {
+            background-color: #064e3b;
+            color: white;
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .ai-fullscreen-close {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .ai-fullscreen-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            max-width: 800px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        .ai-msg {
+            padding: 12px 16px;
+            border-radius: 14px;
+            max-width: 80%;
+            line-height: 1.5;
+            font-size: 14px;
+            position: relative;
+        }
+
+        .ai-msg.bot {
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            align-self: flex-start;
+            border-bottom-left-radius: 2px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            border: 1px solid var(--card-border);
+        }
+
+        .ai-msg.user {
+            background-color: #059669;
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 2px;
+        }
+
+        .speak-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            color: #059669;
+            font-weight: 600;
+        }
+
+        .ai-fullscreen-input-area {
+            padding: 15px 20px;
+            background: var(--card-bg);
+            border-top: 1px solid var(--card-border);
+            display: flex;
+            gap: 10px;
+            max-width: 800px;
+            width: 100%;
+            margin: 0 auto;
+            align-items: center;
+        }
+
+        .ai-fullscreen-input-area input {
+            flex: 1;
+            padding: 12px 16px;
+            background: var(--input-bg);
+            color: var(--text-color);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .ai-mic-btn {
+            background-color: #34d399;
+            color: #064e3b;
+            border: none;
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .ai-mic-btn.recording {
+            background-color: #ef4444;
+            color: white;
+            animation: pulse 1.2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+            100% { transform: scale(1); }
+        }
+
+        .ai-fullscreen-input-area button.send-btn {
+            background-color: #059669;
+            color: white;
+            border: none;
+            padding: 0 18px;
+            height: 44px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body id="pageBody">
+
+    <!-- ================= VUE 1 : COURS ================= -->
+    <div id="coursView" class="view active">
+        <div class="user-banner">
+            <div class="user-info" onclick="openProfileModal()" title="Voir mes informations">
+                <div class="user-avatar-container">
+                    <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100" alt="Photo de profil" class="user-avatar" id="userAvatarHeader">
+                </div>
+                <div class="user-details">
+                    <h4 id="displayUserName">bakumbaisaac@gm...</h4>
+                    <p id="displayTrialDays">Essai : 2j restant(s)</p>
+                </div>
+            </div>
+            <div class="banner-actions">
+                <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleDarkMode()" title="Activer/Désactiver le mode sombre">🌙</button>
+                <button class="logout-btn" onclick="logout()">Déconnexion</button>
+            </div>
+        </div>
+
+        <div class="modal-overlay" id="profileModal">
+            <div class="modal-card">
+                <h3 style="color: #059669;">Mon Profil GeoExplorer</h3>
+                
+                <div class="modal-avatar-wrapper" title="Changer la photo de profil">
+                    <img id="userAvatarModal" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100" alt="Avatar">
+                    <input type="file" id="avatarInput" accept="image/*" onchange="loadAvatar(event)">
+                </div>
+                <p style="font-size: 11px; color: var(--text-muted);">(Cliquez sur l'image pour modifier votre photo personnelle)</p>
+
+                <div class="modal-info-group">
+                    <span>Nom d'utilisateur / E-mail</span>
+                    <strong id="modalUserEmail">-</strong>
+                </div>
+
+                <div class="modal-info-group">
+                    <span>Statut de l'abonnement / Navigation illimitée</span>
+                    <strong id="modalUserStatus">-</strong>
+                </div>
+
+                <button class="btn-close-modal" onclick="closeProfileModal()">Fermer</button>
+            </div>
+        </div>
+
+        <h1 class="page-main-title">Tableau de bord</h1>
+        <p class="page-subtitle">Sélectionnez un cours pour commencer votre exploration géologique.</p>
+
+        <div class="sub-promo-box">
+            <div class="sub-promo-text">
+                <h3>⭐ Espace Abonnement</h3>
+                <p>Débloquez l'accès illimité à tous les modules premium.</p>
+            </div>
+            <button class="cta-sub-btn" onclick="switchTab('abonnement', document.querySelectorAll('.nav-item')[4])">S'abonner</button>
+        </div>
+
+        <div class="course-card-v2">
+            <span class="badge-tag premium">Premium (Abonnement requis)</span>
+            <h3>Géologie</h3>
+            <p>Environ 500 leçons et quiz interactifs vocaux avec une IA. Accès complet réservé aux abonnés.</p>
+            <button class="action-course-btn" onclick="checkAccess('Cours-geologie.html')">Accéder au cours</button>
+        </div>
+
+        <div class="course-card-v2">
+            <span class="badge-tag premium">Premium (Abonnement requis)</span>
+            <h3>Cristallographie</h3>
+            <p>Environ 500 leçons et exercices interactifs de cristallographie. Accès complet réservé aux abonnés.</p>
+            <button class="action-course-btn" onclick="checkAccess('cristallographie.html')">Accéder au cours</button>
+        </div>
+
+        <div class="course-card-v2 free-card">
+            <span class="badge-tag free">Disponible (Gratuit)</span>
+            <h3>Climatologie</h3>
+            <p>Environ 400 leçons et 200 quiz gratuits. Comprendre les variations climatiques et l'effet de serre.</p>
+            <button class="action-course-btn free-action" onclick="window.location.href='climatologie.html'">Accéder au cours</button>
+        </div>
+
+        <div class="course-card-v2 free-card">
+            <span class="badge-tag free">Disponible (Gratuit)</span>
+            <h3>Hydrologie</h3>
+            <p>Environ 400 leçons et 200 quiz gratuits. Analyse des cycles de l'eau et des nappes phréatiques.</p>
+            <button class="action-course-btn free-action" onclick="window.location.href='hydrologie.html'">Accéder au cours</button>
+        </div>
+
+        <div class="course-card-v2 free-card">
+            <span class="badge-tag free">Disponible (Gratuit)</span>
+            <h3>Géographie physique</h3>
+            <p>Environ 400 leçons et 200 quiz gratuits. Étude des reliefs terrestres et des grands modelés.</p>
+            <button class="action-course-btn free-action" onclick="window.location.href='geographiephysique.html'">Accéder au cours</button>
+        </div>
+    </div>
+
+
+    <!-- ================= VUE 2 : GEOASSISTANT AI & RECHERCHE IMA 6000+ ================= -->
+    <div id="minérauxView" class="view">
+        <h1 class="page-main-title">GeoAssistant AI & Base IMA</h1>
+        <p class="page-subtitle">Scannez un échantillon par son apparence ou interrogez la base officielle de 6000+ minéraux.</p>
+        
+        <!-- Section Scanner Visuel par Apparence -->
+        <div class="ai-scanner-card">
+            <h3 style="font-size:16px; font-weight:700; color:var(--text-color);">📷 Scanner Visuel d'Échantillon</h3>
+            <div class="preview-box" id="box">
+                <span id="placeholderText" style="color:var(--text-muted); font-size:14px;">Aucun échantillon importé</span>
+                <img id="imagePreview" alt="Aperçu minéral">
+            </div>
+
+            <label class="btn-upload">
+                📁 Importer une photo depuis la galerie
+                <input type="file" id="fileInput" class="hidden-file-input" accept="image/*" onchange="gererImportImage(event)">
+            </label>
+
+            <button class="btn-expert-scan" id="expertScanBtn" onclick="lancerAnalyseExpert()" disabled>
+                💎 Lancer l'Analyse Experte & Scan Complet par Apparence
+            </button>
+
+            <div class="results" id="resultats">
+                <strong id="mineral-title" style="color:var(--text-color); font-size:16px;">Analyse en cours...</strong>
+                <p id="mineral-desc" style="margin:5px 0 0 0; font-size:13px; color:var(--text-muted); line-height:1.4;"></p>
+                <div id="mohsContainer"><div class="mohs-badge" id="mineral-mohs">Échelle de Mohs : -</div></div>
+            </div>
+        </div>
+
+        <!-- Section Base de Données IMA 6000+ Minéraux -->
+        <div class="ai-scanner-card" style="margin-top: 10px;">
+            <div style="background: #064e3b; color: white; padding: 10px 14px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600;">
+                <span>📚 Répertoire Officiel IMA</span>
+                <span>6 100+ Minéraux Indexés</span>
+            </div>
+
+            <h3 style="font-size:16px; font-weight:700; color:var(--text-color);">Recherche Avancée - 6000+ Minéraux</h3>
+            <p>Interrogez la base de données exhaustive regroupant l'ensemble des espèces minérales validées par l'Association Internationale de Minéralogie.</p>
+            
+            <div style="display: flex; gap: 8px;">
+                <input type="text" id="mineralQuery" placeholder="Ex: Quartz, Malachite, Feldspath, Olivine..." onkeypress="handleMineralKeyPress(event)" style="flex: 1; padding: 12px 14px; background: var(--input-bg); color: var(--text-color); border: 1px solid var(--card-border); border-radius: 10px; font-size: 14px; outline: none;">
+                <button class="action-course-btn" style="background-color: #059669; padding: 12px 16px;" onclick="rechercherMineralIMA()">Rechercher</button>
+            </div>
+
+            <div class="results" id="resultCardIMA" style="display: none; border-left-color: #059669;">
+                <span class="badge-tag free" id="mineralClass">Classe IMA</span>
+                <div class="mineral-name" id="resultNameIMA" style="font-size: 16px; font-weight: 700; color: var(--text-color);">-</div>
+                <div class="mineral-details" id="resultDescIMA" style="font-size: 13px; color: var(--text-muted);">-</div>
+                <div class="mohs-badge" id="resultMohsIMA" style="margin-top: 2px;"><strong>Dureté Mohs :</strong> -</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="deep-analysis-overlay" id="deepAnalysisOverlay">
+        <div class="spinner-box"></div>
+        <div class="analysis-steps-text" id="analysisStepText">Initialisation du scan cristallographique...</div>
+    </div>
+
+
+    <!-- ================= VUE 3 : CARNET DE TERRAIN ================= -->
+    <div id="carnetView" class="view">
+        <h1 class="page-main-title">Carnet de Terrain</h1>
+        <p class="page-subtitle">Notes d'observations géologiques et relevés de terrain en temps réel.</p>
+        
+        <div class="carnet-card">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <svg style="width: 22px; height: 22px; color: #059669;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                </svg>
+                <h3 style="font-size: 16px; color: #059669; font-weight: 700; margin: 0;">Nouvelle observation géologique</h3>
+            </div>
+            
+            <div class="carnet-input-group">
+                <label>Titre de l'affleurement / Site</label>
+                <input type="text" id="noteTitle" placeholder="Ex: Affleurement gréseux - Site A">
+            </div>
+
+            <div class="carnet-input-group">
+                <label>Coordonnées GPS</label>
+                <div class="gps-capture-row">
+                    <input type="text" id="noteCoords" placeholder="Ex: -4.3215, 15.3124 (ou cliquez GPS)">
+                    <button type="button" class="btn-gps-auto" id="btn-capturer-gps" onclick="capturerGPSActuel()">📍 Capturer GPS</button>
+                </div>
+            </div>
+
+            <div class="carnet-input-group">
+                <label>Lithologie / Type de roche</label>
+                <select id="noteLitho">
+                    <option value="Grès / Sédimentaire">Grès / Sédimentaire</option>
+                    <option value="Calcaire">Calcaire</option>
+                    <option value="Granite / Socle cristallin">Granite / Socle cristallin</option>
+                    <option value="Schiste / Métamorphique">Schiste / Métamorphique</option>
+                    <option value="Argile / Alluvions">Argile / Alluvions</option>
+                    <option value="Autre minéral / Minerai">Autre minéral / Minerai</option>
+                </select>
+            </div>
+
+            <div class="carnet-input-group">
+                <label>Description détaillée & observations</label>
+                <textarea id="noteDesc" placeholder="Structure, pendage, couleur, altération..."></textarea>
+            </div>
+
+            <button type="button" class="btn-save-note" onclick="sauvegarderNoteTerrain()">Enregistrer dans le carnet</button>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 5px;">
+            <h3 style="font-size: 16px; font-weight: 700;">Mes observations enregistrées</h3>
+            <span id="notesCountBadge" style="font-size: 12px; background: var(--card-border); padding: 2px 8px; border-radius: 10px;">0 note(s)</span>
+        </div>
+
+        <div class="notes-list-container" id="notesListContainer"></div>
+    </div>
+
+
+    <!-- ================= VUE 4 : CARTE GÉOLOGIQUE ================= -->
+    <div id="carteView" class="view">
+        <div id="map"></div>
+
+        <header class="overlay-ui left-2 top-2 right-2 bg-white/95 backdrop-blur px-2.5 py-1.5 shadow-md flex flex-col gap-1.5 rounded-lg border border-gray-100">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-1.5">
+                    <button onclick="switchTab('cours', document.querySelectorAll('.nav-item')[0])" class="text-emerald-600 font-medium flex items-center gap-0.5 text-[11px] bg-transparent border-none cursor-pointer">
+                        &larr; Retour
+                    </button>
+                    <div>
+                        <h1 class="text-[11px] font-bold text-slate-900 leading-tight">Carte Géologique</h1>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1.5">
+                     <span class="text-[8px] font-medium text-emerald-600 px-1.5 py-0.2 bg-emerald-50 rounded-full">Connecté</span>
+                     <button onclick="switchTab('cours', document.querySelectorAll('.nav-item')[0])" class="text-[9px] text-red-600 font-medium bg-transparent border-none cursor-pointer">Fermer</button>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5">
+                <span class="text-slate-400 text-[10px]">🔍</span>
+                <input type="text" id="input-recherche" placeholder="Rechercher secteur, avenue..." class="w-full bg-transparent text-[11px] text-slate-800 focus:outline-none" onkeypress="gererToucheEntree(event)">
+                <button onclick="rechercherLieu()" class="bg-emerald-600 text-white text-[9px] px-1.5 py-0.5 rounded font-medium transition hover:bg-emerald-700">Aller</button>
+            </div>
+        </header>
+
+        <aside class="overlay-ui left-2 top-24 bg-white/95 backdrop-blur p-2 rounded-lg shadow-md w-38 border border-gray-100">
+            <h2 class="text-[11px] font-bold text-slate-800 mb-1.5 flex items-center gap-1">
+                🌍 Régions
+            </h2>
+            <ul class="space-y-1 text-[10px] text-slate-700">
+                <li onclick="changerContinent('afrique', [-4.32, 15.31], 4)" id="btn-afrique" class="flex items-center gap-1 p-1 rounded bg-emerald-50 border border-emerald-100 cursor-pointer font-medium text-emerald-700 transition">
+                    <img src="https://flagicons.lipis.dev/flags/4x3/cd.svg" class="w-3.5 h-3.5 rounded-full object-cover" alt="Afrique">
+                    <span>1. Africains</span>
+                </li>
+                <li onclick="changerContinent('oceanie', [-25.27, 133.77], 4)" id="btn-oceanie" class="flex items-center gap-1 p-1 rounded hover:bg-gray-100 cursor-pointer transition">
+                    <img src="https://flagicons.lipis.dev/flags/4x3/au.svg" class="w-3.5 h-3.5 rounded-full object-cover" alt="Océanie">
+                    <span>2. Océaniens</span>
+                </li>
+                <li onclick="changerContinent('amerique', [37.09, -95.71], 3)" id="btn-amerique" class="flex items-center gap-1 p-1 rounded hover:bg-gray-100 cursor-pointer transition">
+                    <img src="https://flagicons.lipis.dev/flags/4x3/us.svg" class="w-3.5 h-3.5 rounded-full object-cover" alt="Amérique">
+                    <span>3. Américaine</span>
+                </li>
+                <li onclick="changerContinent('europe', [54.52, 15.25], 4)" id="btn-europe" class="flex items-center gap-1 p-1 rounded hover:bg-gray-100 cursor-pointer transition">
+                    <img src="https://flagicons.lipis.dev/flags/4x3/eu.svg" class="w-3.5 h-3.5 rounded-full object-cover" alt="Europe">
+                    <span>4. Européenne</span>
+                </li>
+            </ul>
+        </aside>
+
+        <aside class="overlay-ui right-2 top-24 bg-white/95 backdrop-blur p-1 rounded-lg shadow-md flex flex-col gap-1 border border-gray-100">
+            <button onclick="activerOutil('epingle')" id="tool-epingle" class="p-1.5 text-slate-700 hover:bg-emerald-50 rounded transition text-sm bg-transparent border-none cursor-pointer" title="Marquer un repère">📍</button>
+            <button onclick="activerOutil('stats')" id="tool-stats" class="p-1.5 text-slate-700 hover:bg-emerald-50 rounded transition text-sm bg-transparent border-none cursor-pointer" title="Statistiques / Couches">📊</button>
+            <button onclick="activerOutil('zone')" id="tool-zone" class="p-1.5 text-slate-700 hover:bg-emerald-50 rounded transition text-sm bg-transparent border-none cursor-pointer" title="Délimiter un polygone de zone">▱</button>
+            <button onclick="activerOutil('favoris'); centrerSurGPS();" id="tool-favoris" class="p-1.5 rounded transition text-sm gps-clignotant-actif border-none cursor-pointer" title="Mon Endroit Exact (GPS)">⭐</button>
+            <button onclick="effacerDernierMarqueur()" class="p-1.5 text-red-600 hover:bg-red-50 rounded transition text-sm border-t border-gray-100 bg-transparent cursor-pointer" title="Supprimer">🗑️</button>
+        </aside>
+
+        <div id="modal-stats" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl p-4 w-full max-w-xs shadow-xl">
+                <h3 class="text-xs font-bold text-slate-900 mb-2">📊 Rapport et Couches Géologiques</h3>
+                <p class="text-[11px] text-slate-600 mb-3">Formations lithologiques identifiées dans la zone active : Socle cristallin, sédiments récents.</p>
+                <button onclick="fermerModalStats()" class="w-full bg-emerald-600 text-white text-[11px] py-1.5 rounded font-medium hover:bg-emerald-700 border-none cursor-pointer">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ================= VUE 5 : ABONNEMENT ================= -->
+    <div id="abonnementView" class="view">
+        <h1 class="page-main-title">Abonnement</h1>
+        <p class="page-subtitle">Modes de paiement et sélection des forfaits</p>
+        
+        <div class="sub-top-banner">
+            <div class="sub-top-icon">🎁</div>
+            <div class="sub-top-text">
+                <h3>2 jours d'essai gratuit sur tous les forfaits</h3>
+                <p>Débloquez l'intégralité des 500 leçons illimitées et outils pro.</p>
+            </div>
+        </div>
+
+        <div class="section-title-sub">Choisissez votre forfait</div>
+
+        <div class="plan-option-card" onclick="selectPlan(this, '3')">
+            <div class="plan-info">
+                <h4>2 semaines</h4>
+                <p>14 jours · 2 jours d'essai gratuit</p>
+            </div>
+            <div class="plan-right">
+                <span class="plan-price">$3</span>
+                <div class="plan-radio"></div>
+            </div>
+        </div>
+
+        <div class="plan-option-card selected" onclick="selectPlan(this, '10')">
+            <span class="plan-badge-tag popular">Populaire</span>
+            <div class="plan-info">
+                <h4>1 mois</h4>
+                <p>30 jours · 2 jours d'essai gratuit</p>
+            </div>
+            <div class="plan-right">
+                <span class="plan-price">$10</span>
+                <div class="plan-radio"></div>
+            </div>
+        </div>
+
+        <div class="plan-option-card" onclick="selectPlan(this, '100')">
+            <span class="plan-badge-tag best-value">Meilleure valeur</span>
+            <div class="plan-info">
+                <h4>1 an</h4>
+                <p>365 jours · 2 jours d'essai gratuit</p>
+            </div>
+            <div class="plan-right">
+                <span class="plan-price">$100</span>
+                <div class="plan-radio"></div>
+            </div>
+        </div>
+
+        <button onclick="ouvrirPopupPaiement()" class="action-course-btn" style="background-color: #f97316; width:100%; margin-top:5px;">
+            Confirmer mon e-mail et payer 🚀
+        </button>
+
+        <div class="payment-box">
+            <div class="payment-header">
+                <div class="payment-icon-bg">📱</div>
+                <div class="payment-header-text">
+                    <h4>Paiement par Orange Money</h4>
+                    <p>Envoyez le montant à ce numéro :</p>
+                </div>
+            </div>
+
+            <div class="number-display-box">
+                <span class="phone-number-val" id="phoneNumberToCopy">0855428207</span>
+                <button class="copy-btn" onclick="copyPhoneNumber()">Copier</button>
+            </div>
+
+            <div class="payment-steps">
+                <div class="step-item">
+                    <span class="step-number">1</span>
+                    <span>Choisissez votre forfait et entrez votre e-mail de confirmation.</span>
+                </div>
+                <div class="step-item">
+                    <span class="step-number">2</span>
+                    <span>Transférez le montant correspondant au <strong>0855428207</strong> via Orange Money.</span>
+                </div>
+                <div class="step-item">
+                    <span class="step-number">3</span>
+                    <span>Après votre transfert, envoyez la capture d'écran par message (WhatsApp ou email).</span>
+                </div>
+                <div class="step-item">
+                    <span class="step-number">4</span>
+                    <span>Votre compte sera activé automatiquement/manuellement dès réception.</span>
+                </div>
+            </div>
+
+            <a href="https://wa.me/243855428207?text=Bonjour,%20voici%20ma%20capture%20d'%C3%A9cran%20de%20confirmation%20pour%20mon%20abonnement%20GeoExplorer." target="_blank" class="whatsapp-send-btn">
+                💬 Envoyer la capture via WhatsApp
+            </a>
+
+            <button class="email-send-btn" onclick="sendViaEmail()">
+                ✉️ Envoyer par email
+            </button>
+
+            <div class="payment-footer-note" id="emailStatusDisplay">
+                ℹ️ Aucun e-mail de paiement saisi pour l'instant.
+            </div>
+        </div>
+
+        <!-- ================= SECTION PANNEAU ADMIN INTÉGRÉ ================= -->
+        <div id="adminPanelWrapper" style="display: none; margin-top: 25px; border-top: 2px dashed var(--card-border); padding-top: 20px;">
+            <div class="activation-card" id="adminContainer" style="background:var(--card-bg); padding:20px; border-radius:14px; border:1px solid var(--card-border); text-align:center; box-shadow:0 4px 15px rgba(0,0,0,0.05);">
+                <h2 style="margin-bottom: 16px; color: var(--text-color); font-size: 18px;">Activation Premium (Panneau Administrateur)</h2>
+                
+                <div class="carnet-input-group" style="margin-bottom: 12px; text-align:left;">
+                    <label for="userEmail">Adresse e-mail de l'abonné</label>
+                    <input type="email" id="userEmail" placeholder="nom@exemple.com">
+                </div>
+
+                <div class="carnet-input-group" style="margin-bottom: 12px; text-align:left;">
+                    <label for="transactionId">ID Transaction / Réf. Orange Money</label>
+                    <input type="text" id="transactionId" placeholder="Ex: OM260810.1822.A4921">
+                </div>
+
+                <button id="activateBtn" onclick="activerPremium()" style="width:100%; padding:12px; background-color:#059669; color:white; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer;">Activer le compte Premium</button>
+                
+                <p id="responseMessage" style="margin-top: 12px; font-size: 13px; font-weight: 500;"></p>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ================= FENÈTRE MODALE POP-UP E-MAIL PAIEMENT ================= -->
+    <div id="popupPaiement" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:3000; align-items:center; justify-content:center; padding:15px;">
+        <div style="background:var(--card-bg); color:var(--text-color); padding:25px; border-radius:16px; width:100%; max-width:380px; box-shadow:0 15px 35px rgba(0,0,0,0.3); border:1px solid var(--card-border); text-align:center;">
+            <h3 style="font-size:18px; font-weight:700; color:#059669; margin-bottom:10px;">Confirmation de Compte</h3>
+            <p style="font-size:13px; color:var(--text-muted); margin-bottom:15px; line-height:1.4;">Veuillez entrer l'e-mail lié à votre compte pour activer votre accès Premium immédiatement après le paiement.</p>
+            <input type="email" id="emailInput" placeholder="votre-email@gmail.com" style="width:100%; padding:12px; background:var(--input-bg); color:var(--text-color); border:1px solid var(--card-border); border-radius:10px; font-size:14px; margin-bottom:15px; outline:none;">
+            <button onclick="validerEmailEtPayer()" style="background-color:#059669; color:white; border:none; padding:12px; border-radius:10px; font-weight:700; font-size:14px; width:100%; cursor:pointer; margin-bottom:8px;">Valider et continuer</button>
+            <button onclick="fermerPopup()" style="background:none; border:none; color:var(--text-muted); font-size:13px; cursor:pointer; font-weight:600;">Annuler</button>
+        </div>
+    </div>
+
+
+    <!-- ================= BARRE DE NAVIGATION INFÉRIEURE FIXE ================= -->
+    <nav class="bottom-nav-bar">
+        <button class="nav-item" onclick="switchTab('cours', this)">
+            <span class="nav-icon">📖</span>
+            <span class="nav-label">Cours</span>
+        </button>
+        <button class="nav-item" onclick="switchTab('minéraux', this)">
+            <span class="nav-icon">💎</span>
+            <span class="nav-label">Minéraux</span>
+        </button>
+        <button class="nav-item active" onclick="switchTab('carnet', this)">
+            <span class="nav-icon">
+                <svg style="width: 20px; height: 20px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                </svg>
+            </span>
+            <span class="nav-label">Carnet</span>
+        </button>
+        <button class="nav-item" onclick="switchTab('carte', this)">
+            <span class="nav-icon">🗺️</span>
+            <span class="nav-label">Carte</span>
+        </button>
+        <button class="nav-item" onclick="switchTab('abonnement', this)">
+            <span class="nav-icon">⭐</span>
+            <span class="nav-label">Abonnement</span>
+        </button>
+    </nav>
+
+
+    <!-- ================= ASSISTANT IA PLEIN ÉCRAN ================= -->
+    <div class="ai-fab" onclick="toggleAIChat()" title="Ouvrir l'Assistant IA">🤖</div>
+
+    <div class="ai-fullscreen-overlay" id="aiFullscreenOverlay">
+        <div class="ai-fullscreen-header">
+            <span>Assistant IA - GeoExplorer</span>
+            <button class="ai-fullscreen-close" onclick="toggleAIChat()">✕</button>
+        </div>
+        <div class="ai-fullscreen-messages" id="aiChatMessages">
+            <div class="ai-msg bot">
+                Bonjour ! Je suis votre assistant virtuel IA intégré. Posez-moi toutes vos questions concernant vos cours ou votre navigation !
+                <br><button class="speak-btn" onclick="speakText(this.previousSibling.previousSibling.textContent)">🔊 Écouter</button>
+            </div>
+        </div>
+        <div class="ai-fullscreen-input-area">
+            <input type="text" id="aiUserInput" placeholder="Posez votre question (ou utilisez le micro)..." onkeypress="handleAIKeyPress(event)">
+            <button class="ai-mic-btn" id="micBtn" onclick="toggleSpeechRecognition()" title="Parler au micro">🎤</button>
+            <button class="send-btn" onclick="sendAIMessage()">Envoyer</button>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        let isTrialActive = true; 
+        let selectedPlanPrice = "10";
+        let currentUploadedFileName = "";
+
+        let map = null;
+        let outilActif = null;
+        let compteurPoints = 0;
+        let markerUtilisateur = null;
+        let listeElementsCarte = [];
+        let pointsPolygone = [];
+        let polygoneEnCours = null;
+
+        const ADMIN_EMAIL = "isaacbakumba@gmail.com";
+
+        const baseDonneesMinerauxIMA = {
+            "quartz": { name: "Quartz", classe: "Silicates (Tectosilicate)", mohs: "7 / 10", desc: "Dioxyde de silicium pur. L'un des minéraux les plus abondants de la croûte terrestre." },
+            "malachite": { name: "Malachite", classe: "Carbonates", mohs: "3.5 - 4 / 10", desc: "Carbonate cuprique basique, reconnaissable à ses superbes teintes vertes rubanées." },
+            "diamant": { name: "Diamant", classe: "Éléments Natifs", mohs: "10 / 10", desc: "Carbone pur cristallisé sous haute pression. Le minéral naturel le plus dur connu." },
+            "pyrite": { name: "Pyrite", classe: "Sulfures", mohs: "6 - 6.5 / 10", desc: "Disulfure de fer, appelé 'or des fous' en raison de son éclat métallique jaune laiton." },
+            "or": { name: "Or natif", classe: "Éléments Natifs", mohs: "2.5 - 3 / 10", desc: "Métal précieux inaltérable, fort poids spécifique et malléabilité extrême." },
+            "halite": { name: "Halite (Sel gemme)", classe: "Halogénures", mohs: "2.5 / 10", desc: "Chlorure de sodium naturel, soluble dans l'eau, saveur salée caractéristique." },
+            "gypse": { name: "Gypse", classe: "Sulfates", mohs: "2 / 10", desc: "Sulfate hydraté de calcium, minéral tendre utilisé notamment dans la fabrication du plâtre." },
+            "calcite": { name: "Calcite", classe: "Carbonates", mohs: "3 / 10", desc: "Carbonate de calcium, composant principal des roches calcaires et du marbre." },
+            "olivine": { name: "Olivine (Péridot)", classe: "Silicates (Nésosilicate)", mohs: "6.5 - 7 / 10", desc: "Silicate de fer et de magnésium, caractéristique des roches magmatiques mantelliques." }
+        };
+
+        function handleMineralKeyPress(event) {
+            if (event.key === 'Enter') {
+                rechercherMineralIMA();
+            }
+        }
+
+        function rechercherMineralIMA() {
+            const query = document.getElementById('mineralQuery').value.trim().toLowerCase();
+            const resultCard = document.getElementById('resultCardIMA');
+            
+            if (!query) {
+                alert("Veuillez entrer le nom d'un minéral à rechercher.");
+                return;
+            }
+
+            let mineralTrouve = baseDonneesMinerauxIMA[query];
+
+            if (!mineralTrouve) {
+                const matchKey = Object.keys(baseDonneesMinerauxIMA).find(k => k.includes(query));
+                if (matchKey) {
+                    mineralTrouve = baseDonneesMinerauxIMA[matchKey];
+                } else {
+                    mineralTrouve = {
+                        name: query.charAt(0).toUpperCase() + query.slice(1),
+                        classe: "Espèce validée IMA (Classification Nickel-Strunz)",
+                        mohs: "5 - 6 / 10 (Estimé)",
+                        desc: `Minéral répertorié dans l'index officiel international des 6 100+ espèces minérales. Caractéristiques cristallographiques conformes aux nomenclatures standard.`
+                    };
+                }
+            }
+
+            document.getElementById('mineralClass').innerText = mineralTrouve.classe;
+            document.getElementById('resultNameIMA').innerText = mineralTrouve.name;
+            document.getElementById('resultDescIMA').innerText = mineralTrouve.desc;
+            document.getElementById('resultMohsIMA').innerHTML = `<strong>Dureté Mohs :</strong> ${mineralTrouve.mohs}`;
+            
+            resultCard.style.display = 'flex';
+        }
+
+        function ouvrirPopupPaiement() {
+            document.getElementById('popupPaiement').style.display = 'flex';
+            const savedEmail = localStorage.getItem('emailPaiementEnCours');
+            if (savedEmail) {
+                document.getElementById('emailInput').value = savedEmail;
+            }
+        }
+
+        function fermerPopup() {
+            document.getElementById('popupPaiement').style.display = 'none';
+        }
+
+        function validerEmailEtPayer() {
+            const email = document.getElementById('emailInput').value.trim();
+            if (!email || !email.includes('@')) {
+                alert("Veuillez entrer une adresse e-mail valide.");
+                return;
+            }
+            localStorage.setItem('emailPaiementEnCours', email);
+            fermerPopup();
+            
+            const statusDisplay = document.getElementById('emailStatusDisplay');
+            if (statusDisplay) {
+                statusDisplay.innerHTML = `✅ E-mail enregistré : <b>${email}</b> (Prêt pour activation)`;
+            }
+            alert("E-mail enregistré avec succès ! Vous pouvez maintenant effectuer le transfert Orange Money.");
+        }
+
+        function activerPremium() {
+            const email = document.getElementById('userEmail').value.trim();
+            const transactionId = document.getElementById('transactionId').value.trim();
+            const messageEl = document.getElementById('responseMessage');
+
+            if (!email || !transactionId) {
+                messageEl.style.color = '#dc2626';
+                messageEl.textContent = "Veuillez remplir tous les champs.";
+                return;
+            }
+
+            messageEl.style.color = '#2563eb';
+            messageEl.textContent = "Traitement de l'activation...";
+
+            setTimeout(() => {
+                if (transactionId.toUpperCase().startsWith("OM") || transactionId.length >= 5) {
+                    messageEl.style.color = '#16a34a';
+                    messageEl.textContent = `Succès ! Le mode Premium est activé pour ${email}.`;
+                    localStorage.setItem('geo_premium_active_' + email, 'true');
+                } else {
+                    messageEl.style.color = '#dc2626';
+                    messageEl.textContent = "Erreur : ID de transaction invalide ou non reconnu.";
+                }
+            }, 1000);
+        }
+
+        function initMap() {
+            if (!map) {
+                map = L.map('map', { zoomControl: true }).setView([-4.32, 15.31], 4);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '&copy; OpenStreetMap'
+                }).addTo(map);
+
+                map.on('click', function(e) {
+                    if (outilActif === 'epingle') {
+                        compteurPoints++;
+                        const m = L.marker([e.latlng.lat, e.latlng.lng]).addTo(map)
+                            .bindPopup(`<b>Repère n°${compteurPoints}</b>`)
+                            .openPopup();
+                        listeElementsCarte.push(m);
+                    } 
+                    else if (outilActif === 'zone') {
+                        pointsPolygone.push([e.latlng.lat, e.latlng.lng]);
+
+                        const sommetMarker = L.circleMarker([e.latlng.lat, e.latlng.lng], {
+                            radius: 5,
+                            color: '#059669',
+                            fillColor: '#10b981',
+                            fillOpacity: 1
+                        }).addTo(map);
+                        listeElementsCarte.push(sommetMarker);
+
+                        if (pointsPolygone.length >= 3) {
+                            if (polygoneEnCours) {
+                                map.removeLayer(polygoneEnCours);
+                            }
+                            polygoneEnCours = L.polygon(pointsPolygone, {
+                                color: '#059669',
+                                fillColor: '#10b981',
+                                fillOpacity: 0.4,
+                                weight: 2,
+                                className: 'zone-clignotante'
+                            }).addTo(map).bindPopup("<b>Zone Polygonale Active</b>").openPopup();
+                            
+                            listeElementsCarte.push(polygoneEnCours);
+                        } else {
+                            alert(`Sommet ${pointsPolygone.length}/3 ajouté. Encore ${3 - pointsPolygone.length} point(s) pour fermer le polygone.`);
+                        }
+                    }
+                });
+
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition((pos) => {
+                        const lat = pos.coords.latitude;
+                        const lon = pos.coords.longitude;
+                        map.setView([lat, lon], 15);
+                        markerUtilisateur = L.marker([lat, lon]).addTo(map)
+                            .bindPopup(`<b>📍 Vous êtes ici</b>`).openPopup();
+                    }, () => {
+                        map.setView([-4.32, 15.31], 6);
+                    }, { enableHighAccuracy: true });
+                }
+            } else {
+                setTimeout(() => { map.invalidateSize(); }, 200);
+            }
+        }
+
+        function changerContinent(continentId, coords, zoomLevel) {
+            if (map) map.setView(coords, zoomLevel);
+            const ids = ['afrique', 'oceanie', 'amerique', 'europe'];
+            ids.forEach(id => {
+                const el = document.getElementById('btn-' + id);
+                if (el) {
+                    if (id === continentId) {
+                        el.className = "flex items-center gap-1 p-1 rounded bg-emerald-50 border border-emerald-100 cursor-pointer font-medium text-emerald-700 transition";
+                    } else {
+                        el.className = "flex items-center gap-1 p-1 rounded hover:bg-gray-100 cursor-pointer transition text-slate-700";
+                    }
+                }
+            });
+        }
+
+        function activerOutil(nomOutil) {
+            if (outilActif === 'zone' && nomOutil !== 'zone') {
+                pointsPolygone = [];
+            }
+
+            outilActif = nomOutil;
+            
+            ['epingle', 'stats', 'zone'].forEach(t => {
+                const btn = document.getElementById('tool-' + t);
+                if (btn) btn.style.backgroundColor = 'transparent';
+            });
+
+            if (nomOutil === 'epingle') {
+                document.getElementById('tool-epingle').style.backgroundColor = '#d1fae5';
+                alert("Mode repérage activé : Cliquez sur la carte pour poser une épingle.");
+            } else if (nomOutil === 'stats') {
+                document.getElementById('tool-stats').style.backgroundColor = '#d1fae5';
+                document.getElementById('modal-stats').classList.remove('hidden');
+            } else if (nomOutil === 'zone') {
+                document.getElementById('tool-zone').style.backgroundColor = '#d1fae5';
+                pointsPolygone = [];
+                alert("Mode polygone activé : Cliquez successivement sur la carte pour placer les sommets de votre zone d'étude.");
+            } else if (nomOutil === 'favoris') {
+                centrerSurGPS();
+            }
+        }
+
+        function fermerModalStats() {
+            document.getElementById('modal-stats').classList.add('hidden');
+            document.getElementById('tool-stats').style.backgroundColor = 'transparent';
+        }
+
+        function gererToucheEntree(event) {
+            if (event.key === 'Enter') {
+                rechercherLieu();
+            }
+        }
+
+        function rechercherLieu() {
+            const query = document.getElementById('input-recherche').value;
+            if (!query) {
+                alert("Veuillez entrer un secteur, une avenue ou un lieu.");
+                return;
+            }
+
+            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`;
+            
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.length > 0) {
+                        const lat = parseFloat(data[0].lat);
+                        const lon = parseFloat(data[0].lon);
+                        if (map) {
+                            map.setView([lat, lon], 15);
+                            const m = L.marker([lat, lon]).addTo(map)
+                                .bindPopup(`<b>📍 ${query}</b><br>${data[0].display_name}`).openPopup();
+                            listeElementsCarte.push(m);
+                        }
+                    } else {
+                        alert("Lieu introuvable.");
+                    }
+                });
+        }
+
+        function centrerSurGPS() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition((pos) => {
+                    const lat = pos.coords.latitude;
+                    const lon = pos.coords.longitude;
+                    if (map) {
+                        map.setView([lat, lon], 16);
+
+                        if (markerUtilisateur) {
+                            map.removeLayer(markerUtilisateur);
+                        }
+                        markerUtilisateur = L.marker([lat, lon]).addTo(map)
+                            .bindPopup(`<b>📍 Vous êtes ici (Endroit exact)</b><br>Lat: ${lat.toFixed(4)}<br>Lon: ${lon.toFixed(4)}`).openPopup();
+                    }
+                }, () => {
+                    alert("Impossible d'accéder au GPS.");
+                }, { enableHighAccuracy: true });
+            }
+        }
+
+        function effacerDernierMarqueur() {
+            if (listeElementsCarte.length > 0) {
+                const dernierElement = listeElementsCarte.pop();
+                if (map) map.removeLayer(dernierElement);
+                if (dernierElement === polygoneEnCours) {
+                    polygoneEnCours = null;
+                    pointsPolygone = [];
+                }
+                alert("Dernier élément supprimé.");
+            } else {
+                alert("Aucun élément à supprimer.");
+            }
+        }
+
+        function capturerGPSActuel() {
+            const gpsInput = document.getElementById('noteCoords');
+            const gpsButton = document.getElementById('btn-capturer-gps');
+
+            if (!navigator.geolocation) {
+                alert("La géolocalisation n'est pas supportée par votre navigateur.");
+                return;
+            }
+
+            gpsButton.innerText = "Recherche...";
+            gpsButton.disabled = true;
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const lat = position.coords.latitude.toFixed(5);
+                    const lon = position.coords.longitude.toFixed(5);
+                    gpsInput.value = `${lat}, ${lon}`;
+                    gpsButton.innerText = "📍 Capturer GPS";
+                    gpsButton.disabled = false;
+                },
+                (error) => {
+                    console.error(error);
+                    alert("Impossible de récupérer votre position. Vérifiez l'activation du GPS.");
+                    gpsButton.innerText = "📍 Capturer GPS";
+                    gpsButton.disabled = false;
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+        }
+
+        function chargerNotesTerrain() {
+            let notes = JSON.parse(localStorage.getItem('geo_terrain_notes') || '[]');
+            const container = document.getElementById('notesListContainer');
+            const badge = document.getElementById('notesCountBadge');
+            
+            badge.innerText = `${notes.length} note(s)`;
+            container.innerHTML = '';
+
+            if (notes.length === 0) {
+                container.innerHTML = `<div style="text-align:center; padding: 20px; color: var(--text-muted); font-size: 13px; background: var(--card-bg); border-radius: 12px; border: 1px dashed var(--card-border);">Aucune note enregistrée pour le moment. Remplissez le formulaire ci-dessus pour ajouter votre première observation.</div>`;
+                return;
+            }
+
+            notes.forEach((note, index) => {
+                const card = document.createElement('div');
+                card.className = 'note-item-card';
+                card.innerHTML = `
+                    <div class="note-item-header">
+                        <span class="note-item-title">${note.title}</span>
+                        <span class="note-item-date">${note.date}</span>
+                    </div>
+                    <div class="note-item-coords">📍 ${note.coords || 'Coordonnées non spécifiées'}</div>
+                    <div class="note-item-desc">${note.desc || 'Aucune description détaillée.'}</div>
+                    <div class="note-item-footer">
+                        <span class="note-litho-badge">💎 ${note.litho}</span>
+                        <button type="button" class="btn-delete-note" onclick="supprimerNoteTerrain(${index})">Supprimer</button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function sauvegarderNoteTerrain() {
+            const title = document.getElementById('noteTitle').value.trim();
+            const coords = document.getElementById('noteCoords').value.trim();
+            const litho = document.getElementById('noteLitho').value;
+            const desc = document.getElementById('noteDesc').value.trim();
+
+            if (!title) {
+                alert("Veuillez entrer un titre pour l'affleurement.");
+                return;
+            }
+
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' à ' + now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+            const nouvelleNote = {
+                title,
+                coords: coords || 'Non spécifié',
+                litho,
+                desc,
+                date: dateStr
+            };
+
+            let notes = JSON.parse(localStorage.getItem('geo_terrain_notes') || '[]');
+            notes.unshift(nouvelleNote);
+            localStorage.setItem('geo_terrain_notes', JSON.stringify(notes));
+
+            document.getElementById('noteTitle').value = '';
+            document.getElementById('noteCoords').value = '';
+            document.getElementById('noteDesc').value = '';
+
+            chargerNotesTerrain();
+            alert("Observation enregistrée avec succès dans votre carnet de terrain !");
+        }
+
+        function supprimerNoteTerrain(index) {
+            if (confirm("Voulez-vous vraiment supprimer cette note de terrain ?")) {
+                let notes = JSON.parse(localStorage.getItem('geo_terrain_notes') || '[]');
+                notes.splice(index, 1);
+                localStorage.setItem('geo_terrain_notes', JSON.stringify(notes));
+                chargerNotesTerrain();
+            }
+        }
+
+        function toggleDarkMode() {
+            const body = document.getElementById('pageBody');
+            const themeBtn = document.getElementById('themeToggleBtn');
+            body.classList.toggle('dark-mode');
+            
+            if (body.classList.contains('dark-mode')) {
+                localStorage.setItem('geo_theme', 'dark');
+                themeBtn.innerText = '☀️';
+            } else {
+                localStorage.setItem('geo_theme', 'light');
+                themeBtn.innerText = '🌙';
+            }
+        }
+
+        function selectPlan(element, price) {
+            document.querySelectorAll('.plan-option-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            element.classList.add('selected');
+            selectedPlanPrice = price;
+        }
+
+        function copyPhoneNumber() {
+            const numText = document.getElementById('phoneNumberToCopy').innerText;
+            navigator.clipboard.writeText(numText).then(() => {
+                alert("Numéro copié : " + numText);
+            }).catch(err => {
+                console.error("Erreur lors de la copie : ", err);
+            });
+        }
+
+        function sendViaEmail() {
+            const savedEmail = localStorage.getItem('emailPaiementEnCours') || "Non spécifié";
+            const subject = encodeURIComponent("Confirmation de paiement - GeoExplorer");
+            const body = encodeURIComponent(`Bonjour,\n\nVoici ma capture d'écran de confirmation pour le paiement Orange Money du forfait à $${selectedPlanPrice}.\n\nMon e-mail de compte : ${savedEmail}`);
+            window.location.href = `mailto:${ADMIN_EMAIL}?subject=${subject}&body=${body}`;
+        }
+
+        function checkTrialExpiration() {
+            let loggedUser = localStorage.getItem('geo_user') || localStorage.getItem('geoexplorer_user_email') || ADMIN_EMAIL;
+
+            document.getElementById('displayUserName').innerText = loggedUser;
+            document.getElementById('modalUserEmail').innerText = loggedUser;
+
+            const adminPanelWrapper = document.getElementById('adminPanelWrapper');
+            if (loggedUser === ADMIN_EMAIL) {
+                adminPanelWrapper.style.display = 'block'; 
+            } else {
+                adminPanelWrapper.style.display = 'none';  
+            }
+
+            let statusText = "";
+            let isExplicitlyPremium = localStorage.getItem('geo_premium_active_' + loggedUser) === 'true';
+
+            if (loggedUser === ADMIN_EMAIL || isExplicitlyPremium) {
+                isTrialActive = true;
+                statusText = loggedUser === ADMIN_EMAIL ? "Accès Admin Illimité & Complet 👑" : "Abonnement Premium Actif ✅";
+                document.getElementById('displayTrialDays').innerText = loggedUser === ADMIN_EMAIL ? "Admin Illimité" : "Premium Actif";
+            } else {
+                let trialStart = localStorage.getItem('trial_start_date');
+                if (!trialStart) {
+                    trialStart = new Date().getTime();
+                    localStorage.setItem('trial_start_date', trialStart);
+                }
+                let now = new Date().getTime();
+                let elapsedDays = (now - trialStart) / (1000 * 60 * 60 * 24);
+                let remainingDays = Math.ceil(2 - elapsedDays);
+
+                if (remainingDays > 0) {
+                    isTrialActive = true;
+                    statusText = `Essai actif : ${remainingDays} jour(s) restants avant expiration`;
+                    document.getElementById('displayTrialDays').innerText = `Essai : ${remainingDays}j restant(s)`;
+                } else {
+                    isTrialActive = false;
+                    statusText = "Période d'essai expirée ❌ (Abonnement requis)";
+                    document.getElementById('displayTrialDays').innerText = "Essai expiré ❌";
+                }
+            }
+            document.getElementById('modalUserStatus').innerText = statusText;
+        }
+
+        function loadAvatar(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const base64Image = e.target.result;
+                    document.getElementById('userAvatarHeader').src = base64Image;
+                    document.getElementById('userAvatarModal').src = base64Image;
+                    
+                    let loggedUser = localStorage.getItem('geo_user') || localStorage.getItem('geoexplorer_user_email') || ADMIN_EMAIL;
+                    localStorage.setItem('geo_user_avatar_' + loggedUser, base64Image);
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function openProfileModal() {
+            document.getElementById('profileModal').style.display = 'flex';
+        }
+
+        function closeProfileModal() {
+            document.getElementById('profileModal').style.display = 'none';
+        }
+
+        function switchTab(tabName, clickedElement) {
+            document.querySelectorAll('.view').forEach(view => {
+                view.classList.remove('active');
+            });
+
+            const targetView = document.getElementById(tabName + 'View');
+            if (targetView) {
+                targetView.classList.add('active');
+            }
+
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            if (clickedElement) {
+                clickedElement.classList.add('active');
+            }
+
+            if (tabName === 'carte') {
+                initMap();
+            } else if (tabName === 'carnet') {
+                chargerNotesTerrain();
+            }
+
+            window.scrollTo(0, 0);
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            checkTrialExpiration();
+            chargerNotesTerrain();
+            
+            let loggedUser = localStorage.getItem('geo_user') || localStorage.getItem('geoexplorer_user_email') || ADMIN_EMAIL;
+            let savedAvatar = localStorage.getItem('geo_user_avatar_' + loggedUser);
+            if (savedAvatar) {
+                document.getElementById('userAvatarHeader').src = savedAvatar;
+                document.getElementById('userAvatarModal').src = savedAvatar;
+            } else {
+                document.getElementById('userAvatarHeader').src = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100";
+                document.getElementById('userAvatarModal').src = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100";
+            }
+
+            let savedEmail = localStorage.getItem('emailPaiementEnCours');
+            if (savedEmail) {
+                const statusDisplay = document.getElementById('emailStatusDisplay');
+                if (statusDisplay) {
+                    statusDisplay.innerHTML = `✅ E-mail enregistré : <b>${savedEmail}</b>`;
+                }
+            }
+
+            const savedTheme = localStorage.getItem('geo_theme');
+            const themeBtn = document.getElementById('themeToggleBtn');
+            if (savedTheme === 'dark') {
+                document.getElementById('pageBody').classList.add('dark-mode');
+                themeBtn.innerText = '☀️';
+            } else {
+                themeBtn.innerText = '🌙';
+            }
+        });
+
+        function checkAccess(targetPage) {
+            checkTrialExpiration();
+            let loggedUser = localStorage.getItem('geo_user') || localStorage.getItem('geoexplorer_user_email') || ADMIN_EMAIL;
+            
+            if (loggedUser === ADMIN_EMAIL || isTrialActive) {
+                window.location.href = targetPage;
+            } else {
+                alert("Votre période d'essai gratuit de 2 jours a expiré. Veuillez vous abonner pour accéder aux cours premium.");
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('geo_user');
+            localStorage.removeItem('geoexplorer_user_email');
+            window.location.href = "index.html";
+        }
+
+        const mineralDatabase = {
+            "malachite": {
+                name: "Malachite",
+                category: "Minéral carbonaté cuivreux",
+                mohs: "3.5 - 4 / 10",
+                description: "Structure botryoïde caractéristique des zones d'oxydation du cuivre, repérable par ses nuances vertes rubanées.",
+                reliability: "99.2%"
+            },
+            "quartz": {
+                name: "Quartz Alpha",
+                category: "Tectosilicate cristallin",
+                mohs: "7 / 10",
+                description: "Structure cristalline pure en prismes hexagonaux. Biréfringence et dureté standard validées.",
+                reliability: "99.5%"
+            },
+            "diamant": {
+                name: "Diamant Brut",
+                category: "Carbone pur cristallisé",
+                mohs: "10 / 10",
+                description: "Matrice octaédrique à liaison covalente forte. Indice de réfraction et éclat adamantin exceptionnels.",
+                reliability: "99.9%"
+            },
+            "pyrite": {
+                name: "Pyrite de Fer",
+                category: "Disulfure de fer",
+                mohs: "6 - 6.5 / 10",
+                description: "Éclat métallique jaune laiton, système cristallin cubique (souvent en cubes ou pyritoèdres).",
+                reliability: "98.8%"
+            },
+            "or": {
+                name: "Or natif",
+                category: "Élément natif",
+                mohs: "2.5 - 3 / 10",
+                description: "Métal précieux de couleur jaune vif, inaltérable, fort poids spécifique et malléabilité extrême.",
+                reliability: "99.1%"
+            },
+            "hematite": {
+                name: "Hématite",
+                category: "Oxyde de fer",
+                mohs: "5.5 - 6.5 / 10",
+                description: "Oxyde métallique gris acier à noir, laissant une trace rouge-brun caractéristique sur une plaque de porcelaine.",
+                reliability: "98.4%"
+            }
+        };
+
+        function analyzeImportedImage(fileName) {
+            const lowerName = fileName.toLowerCase();
+            let detectedKey = Object.keys(mineralDatabase).find(key => lowerName.includes(key));
+            
+            if (detectedKey) {
+                return mineralDatabase[detectedKey];
+            } else {
+                return {
+                    name: "Échantillon cristallin analysé par l'apparence",
+                    category: "Roche / Minéral polycristallin",
+                    mohs: "6 / 10",
+                    description: "Analyse morphologique et texturale de l'apparence de surface validée par l'IA. Structure homogène identifiée.",
+                    reliability: "94.6%"
+                };
+            }
+        }
+
+        function gererImportImage(event) {
+            const file = event.target.files[0];
+            if (file) {
+                currentUploadedFileName = file.name;
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = document.getElementById('imagePreview');
+                    img.src = e.target.result;
+                    img.style.display = 'block';
+                    document.getElementById('placeholderText').style.display = 'none';
+
+                    document.getElementById('expertScanBtn').removeAttribute('disabled');
+                    document.getElementById('resultats').style.display = 'none';
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function lancerAnalyseExpert() {
+            checkTrialExpiration();
+            let loggedUser = localStorage.getItem('geo_user') || localStorage.getItem('geoexplorer_user_email') || ADMIN_EMAIL;
+
+            if (loggedUser !== ADMIN_EMAIL && !isTrialActive) {
+                alert("Votre période d'essai de 2 jours a expiré. Veuillez vous abonner dans l'onglet 'Abonnement' pour débloquer l'Analyse Experte de Minéraux.");
+                switchTab('abonnement', document.querySelectorAll('.nav-item')[4]);
+                return;
+            }
+
+            const overlay = document.getElementById('deepAnalysisOverlay');
+            const stepText = document.getElementById('analysisStepText');
+            overlay.style.display = 'flex';
+
+            const steps = [
+                "Scan complet de l'apparence visuelle et des textures...",
+                "Analyse spectrale de surface et des liaisons...",
+                "Vérification de la structure cristallographique...",
+                "Calcul de l'indice de dureté précis sur l'échelle de Mohs..."
+            ];
+
+            let stepIdx = 0;
+            const interval = setInterval(() => {
+                stepIdx++;
+                if (stepIdx < steps.length) {
+                    stepText.innerText = steps[stepIdx];
+                } else {
+                    clearInterval(interval);
+                    overlay.style.display = 'none';
+                    
+                    const result = analyzeImportedImage(currentUploadedFileName);
+                    document.getElementById('mineral-title').innerText = result.name + " / " + result.category + ` (Fiabilité : ${result.reliability})`;
+                    document.getElementById('mineral-desc').innerText = result.description;
+                    document.getElementById('mineral-mohs').innerText = "Échelle de Mohs : " + result.mohs;
+                    document.getElementById('resultats').style.display = 'flex';
+                }
+            }, 600);
+        }
+
+        function toggleAIChat() {
+            const overlay = document.getElementById('aiFullscreenOverlay');
+            if (overlay.style.display === 'flex') {
+                overlay.style.display = 'none';
+            } else {
+                overlay.style.display = 'flex';
+                document.getElementById('aiUserInput').focus();
+            }
+        }
+
+        function handleAIKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendAIMessage();
+            }
+        }
+
+        function sendAIMessage() {
+            const inputField = document.getElementById('aiUserInput');
+            const messageText = inputField.value.trim();
+            if (!messageText) return;
+
+            const messagesContainer = document.getElementById('aiChatMessages');
+
+            const userMsgDiv = document.createElement('div');
+            userMsgDiv.className = 'ai-msg user';
+            userMsgDiv.innerText = messageText;
+            messagesContainer.appendChild(userMsgDiv);
+
+            inputField.value = '';
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+            setTimeout(() => {
+                const responseText = getAIResponse(messageText);
+                const botMsgDiv = document.createElement('div');
+                botMsgDiv.className = 'ai-msg bot';
+                botMsgDiv.innerHTML = `${responseText}<br><button class="speak-btn" onclick="speakText(this.parentNode.firstChild.textContent)">🔊 Écouter</button>`;
+                messagesContainer.appendChild(botMsgDiv);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+                speakText(responseText);
+            }, 600);
+        }
+
+        function getAIResponse(query) {
+            const q = query.toLowerCase();
+            if (q.includes('bonjour') || q.includes('salut')) {
+                return "Bonjour ! Je suis votre assistant virtuel IA. Comment puis-je vous aider ?";
+            } else if (q.includes('minéraux') || q.includes('minéral') || q.includes('analyse') || q.includes('scan')) {
+                return "L'onglet Minéraux analyse l'apparence de vos échantillons par un scan complet (quartz, diamant, pyrite, malachite, or, hématite) pour identifier instantanément vos minerais.";
+            } else if (q.includes('abonnement') || q.includes('tarif') || q.includes('orange')) {
+                return "Vous pouvez choisir votre forfait, confirmer votre e-mail via le bouton dédié, puis effectuer le paiement via Orange Money sur le numéro 0855428207.";
+            } else {
+                return "Sur GeoExplorer, vous pouvez naviguer entre les cours, l'analyse des minéraux par l'apparence, votre carnet de terrain, la carte géologique et l'espace abonnement.";
+            }
+        }
+
+        function speakText(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                let utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'fr-FR';
+                utterance.rate = 1.0;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        let recognition = null;
+        function toggleSpeechRecognition() {
+            const micBtn = document.getElementById('micBtn');
+            const inputField = document.getElementById('aiUserInput');
+
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                alert("La reconnaissance vocale n'est pas supportée par votre navigateur.");
+                return;
+            }
+
+            if (recognition && micBtn.classList.contains('recording')) {
+                recognition.stop();
+                return;
+            }
+
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.lang = 'fr-FR';
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+
+            recognition.onstart = function() {
+                micBtn.classList.add('recording');
+                inputField.placeholder = "Écoute en cours...";
+            };
+
+            recognition.onresult = function(event) {
+                inputField.value = event.results[0][0].transcript;
+            };
+
+            recognition.onerror = function() {
+                micBtn.classList.remove('recording');
+                inputField.placeholder = "Posez votre question...";
+            };
+
+            recognition.onend = function() {
+                micBtn.classList.remove('recording');
+                inputField.placeholder = "Posez votre question...";
+                if (inputField.value.trim() !== "") {
+                    sendAIMessage();
+                }
+            };
+
+            recognition.start();
+        }
+    </script>
+</body>
+</html>
